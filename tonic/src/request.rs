@@ -203,31 +203,21 @@ impl<T> Request<T> {
         }
     }
 
-    /// Get the remote address of this connection.
-    ///
-    /// This will return `None` if the `IO` type used
-    /// does not implement `Connected` or when using a unix domain socket.
-    /// This currently only works on the server side.
-    pub fn remote_addr(&self) -> Option<SocketAddr> {
+    fn get_tcp_connect_info(&self) -> Option<&TcpConnectInfo> {
         #[cfg(feature = "transport")]
         {
             #[cfg(feature = "tls")]
             {
-                self.extensions()
-                    .get::<TcpConnectInfo>()
-                    .and_then(|i| i.remote_addr())
-                    .or_else(|| {
-                        self.extensions()
-                            .get::<TlsConnectInfo<TcpConnectInfo>>()
-                            .and_then(|i| i.get_ref().remote_addr())
-                    })
+                self.extensions().get::<TcpConnectInfo>().or_else(|| {
+                    self.extensions()
+                        .get::<TlsConnectInfo<TcpConnectInfo>>()
+                        .and_then(|i| Some(i.get_ref()))
+                })
             }
 
             #[cfg(not(feature = "tls"))]
             {
-                self.extensions()
-                    .get::<TcpConnectInfo>()
-                    .and_then(|i| i.remote_addr())
+                self.extensions().get::<TcpConnectInfo>()
             }
         }
 
@@ -235,6 +225,24 @@ impl<T> Request<T> {
         {
             None
         }
+    }
+
+    /// Get the remote address of this connection.
+    ///
+    /// This will return `None` if the `IO` type used
+    /// does not implement `Connected` or when using a unix domain socket.
+    /// This currently only works on the server side.
+    pub fn remote_addr(&self) -> Option<SocketAddr> {
+        self.get_tcp_connect_info().and_then(|i| i.remote_addr())
+    }
+
+    /// Get the local address of this connection.
+    ///
+    /// This will return `None` if the `IO` type used
+    /// does not implement `Connected` or when using a unix domain socket.
+    /// This currently only works on the server side.
+    pub fn local_addr(&self) -> Option<SocketAddr> {
+        self.get_tcp_connect_info().and_then(|i| i.local_addr())
     }
 
     /// Get the peer certificates of the connected client.
